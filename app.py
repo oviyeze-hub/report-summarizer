@@ -2,51 +2,52 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 
-# --- 1. CONFIGURATION ---
-st.set_page_config(page_title="Summarizer Pro", page_icon="📑")
+# --- 1. SETUP ---
+st.set_page_config(page_title="AI Summarizer", page_icon="📝")
 
-# Check if the secret key exists
+# Safety check for the API key
 if "GEMINI_KEY" not in st.secrets:
-    st.error("Missing GEMINI_KEY! Go to App Settings -> Secrets and add it.")
+    st.error("Error: GEMINI_KEY not found in Streamlit Secrets.")
     st.stop()
 
 genai.configure(api_key=st.secrets["GEMINI_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- 2. USER INTERFACE ---
-st.title("📑 AI Report Summarizer")
-st.write("Optimized for Android Mobile")
+# --- 2. MOBILE INTERFACE ---
+st.title("📝 AI Report Summarizer")
 
-style = st.pills("Select Style:", ["Brief", "Detailed", "Actions"]) # Pills look better on mobile
+style = st.selectbox("Summary Type:", ["Bullet Points", "Executive Summary", "Action Plan"])
+uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
+text_input = st.text_area("Or paste text here:")
 
-uploaded_file = st.file_uploader("Upload PDF", type="pdf")
-text_input = st.text_area("Or Paste Text:")
-
-if st.button("Summarize Now", type="primary"):
-    content = ""
+# --- 3. LOGIC ---
+if st.button("Generate Summary", type="primary"):
+    combined_text = ""
     
-    try:
-        if uploaded_file:
-            reader = PdfReader(uploaded_file)
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    content += text
-        else:
-            content = text_input
+    if uploaded_file:
+        reader = PdfReader(uploaded_file)
+        for page in reader.pages:
+            combined_text += page.extract_text()
+    else:
+        combined_text = text_input
 
-        if content.strip():
-            with st.spinner('Thinking...'):
-                prompt = f"Provide a {style} summary. Use bold headers and bullet points:\n\n{content}"
-                response = model.generate_content(prompt)
-                
-                st.subheader("Result:")
-                st.markdown(response.text)
-                
-                # Download button for the summary
-                st.download_button("Download Summary", response.text, file_name="summary.txt")
-        else:
-            st.warning("Please provide content to summarize.")
+    if combined_text:
+        with st.spinner('Processing...'):
+            prompt = f"Summarize this text as a {style}. Focus on the most important facts:\n\n{combined_text}"
+            response = model.generate_content(prompt)
+            summary_result = response.text
             
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+            # Display the result
+            st.subheader("Summary Result")
+            st.markdown(summary_result)
+            
+            # --- 4. THE DOWNLOAD BUTTON ---
+            st.write("---")
+            st.download_button(
+                label="💾 Save Summary to Phone",
+                data=summary_result,
+                file_name="my_summary.txt",
+                mime="text/plain"
+            )
+    else:
+        st.warning("Please upload a file or enter text first.")
